@@ -71,6 +71,26 @@ void emit_print(llvm::Value *position_ptr, llvm::Type *tape_type, llvm::Value *m
     builder->CreateCall(print_type, printchar.getCallee(), {val_i32}, "putchar()");
 }
 
+void emit_get(llvm::Value *position_ptr, llvm::Type *tape_type, llvm::Value *memory_ptr) {
+    llvm::FunctionType *get_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(*context), false);
+
+    llvm::FunctionCallee getchar = module->getOrInsertFunction("getchar", get_type);
+    llvm::Value *result = builder->CreateCall(getchar, getchar.getCallee(), {}, "getchar()");
+    llvm::Value *result_i8 = builder->CreateTrunc(result, llvm::Type::getInt8Ty(*context));
+
+    llvm::Value *position = builder->CreateLoad(llvm::Type::getInt8Ty(*context), position_ptr, "position");
+    llvm::Value *zero = llvm::ConstantInt::get(llvm::Type::getInt8Ty(*context), 0);
+
+    llvm::Value *address = builder->CreateGEP(tape_type,
+                                              memory_ptr,
+                                              {
+                                                  zero,
+                                                  position,
+                                              },
+                                              "address");
+    builder->CreateStore(result_i8, address);
+}
+
 void emit_condjump(llvm::Value *position_ptr, llvm::Type *tape_type, llvm::Value *memory_ptr, llvm::Function *main) {
     llvm::BasicBlock *condition_block = llvm::BasicBlock::Create(*context, "while.cond", main);
     builder->CreateBr(condition_block);
@@ -109,10 +129,6 @@ void emit_loop_end() {
 }
 
 int main() {
-    context = new llvm::LLVMContext();
-    module = new llvm::Module("top", *context);
-    builder = new llvm::IRBuilder<>(*context);
-
     llvm::FunctionType *main_function_type = llvm::FunctionType::get(builder->getVoidTy(), false);
     llvm::Function *main = llvm::Function::Create(main_function_type, llvm::GlobalValue::ExternalLinkage, "main",
                                                   *module);
